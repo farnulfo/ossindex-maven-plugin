@@ -26,10 +26,19 @@
  */
 package net.ossindex.maven.plugin;
 
+import java.util.List;
+
+import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.MavenProject;
+import org.eclipse.aether.RepositorySystem;
+import org.eclipse.aether.RepositorySystemSession;
+import org.eclipse.aether.repository.RemoteRepository;
 
 /** Cross reference the project against information in OSS Index to identify
  * security and maintenance problems.
@@ -37,10 +46,51 @@ import org.apache.maven.plugins.annotations.Mojo;
  * @author Ken Duck
  *
  */
-@Mojo( name = "ossindex")
+@Mojo( name = "audit")
 public class OssIndexMojo extends AbstractMojo
 {
-
+    /**
+     * The entry point to Aether, i.e. the component doing all the work.
+     * 
+     * @component
+     */
+	@Component
+    private RepositorySystem repoSystem;
+ 
+    /**
+     * The current repository/network configuration of Maven.
+     * 
+     * @parameter default-value="${repositorySystemSession}"
+     * @readonly
+     */
+    @Parameter(defaultValue="${repositorySystemSession}", readonly = true)
+    private RepositorySystemSession repoSession;
+ 
+    /**
+     * The project's remote repositories to use for the resolution of project dependencies.
+     * 
+     * @parameter default-value="${project.remoteProjectRepositories}"
+     * @readonly
+     */
+    @Parameter(defaultValue="${project.remoteProjectRepositories}", readonly = true)
+    private List<RemoteRepository> projectRepos;
+ 
+    /**
+     * The project's remote repositories to use for the resolution of plugins and their dependencies.
+     * 
+     * @parameter default-value="${project.remotePluginRepositories}"
+     * @readonly
+     */
+    @Parameter(defaultValue="${project.remotePluginRepositories}", readonly = true)
+    private List<RemoteRepository> pluginRepos;
+    
+    /**
+     * 
+     */
+    @Parameter(defaultValue="${project}", readonly = true, required = true)
+    private MavenProject project;
+ 
+    // Your other mojo parameters and code here
 	/*
 	 * (non-Javadoc)
 	 * @see org.apache.maven.plugin.Mojo#execute()
@@ -48,7 +98,14 @@ public class OssIndexMojo extends AbstractMojo
 	@Override
 	public void execute() throws MojoExecutionException, MojoFailureException
 	{
-		getLog().info( "Hello, world." );
+		getLog().info( "Hello, world: " + project);
+		
+		@SuppressWarnings("unchecked")
+		List<Dependency> deps = project.getDependencies();
+		for (Dependency dep : deps)
+		{
+			System.err.println("  * " + dep);
+		}
 	}
 
 }
