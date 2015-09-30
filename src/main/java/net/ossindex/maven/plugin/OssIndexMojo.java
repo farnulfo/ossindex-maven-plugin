@@ -27,6 +27,7 @@
 package net.ossindex.maven.plugin;
 
 import java.io.IOException;
+import java.net.SocketException;
 import java.net.URI;
 import java.util.Collection;
 import java.util.LinkedList;
@@ -123,6 +124,11 @@ public class OssIndexMojo extends AbstractMojo
 				{
 					failures += report(adep);
 				}
+			}
+			catch (SocketException e)
+			{
+				getLog().error(e.getMessage());
+				break;
 			}
 			catch (IOException e)
 			{
