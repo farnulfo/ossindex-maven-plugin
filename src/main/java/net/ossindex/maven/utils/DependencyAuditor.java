@@ -33,10 +33,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import net.ossindex.common.resource.AbstractRemoteResource;
 import net.ossindex.common.resource.ArtifactResource;
 import net.ossindex.common.resource.ScmResource;
-import net.ossindex.common.resource.VulnerabilityResource;
 import net.ossindex.common.utils.PackageDependency;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -63,12 +61,19 @@ public class DependencyAuditor
 	private RepositorySystem repoSystem;
 	private RepositorySystemSession session;
 
+	/**
+	 * Testing constructor only
+	 */
+	DependencyAuditor()
+	{
+	}
+
 	public DependencyAuditor(RepositorySystem repoSystem, RepositorySystemSession session)
 	{
 		this.repoSystem = repoSystem;
 		this.session = session;
 	}
-	
+
 	/** Audit the artifact and its dependencies
 	 * 
 	 * @param groupId
@@ -112,7 +117,7 @@ public class DependencyAuditor
 
 			PreorderNodeListGenerator nlg = new PreorderNodeListGenerator();
 			node.accept( nlg );
-			
+
 			List<Artifact> artifacts = nlg.getArtifacts(false);
 			for (Artifact artifact : artifacts)
 			{
@@ -126,23 +131,27 @@ public class DependencyAuditor
 		}
 		return packageDependency;
 	}
-	
+
 	/** Query OSS Index to get useful information about the dependencies. Sets the
 	 * information in the appropriate package dependency.
+	 * 
+	 * Package protected to allow us to test
 	 * 
 	 * @param array
 	 * @throws IOException 
 	 */
-	private void setDependencyInformation(PackageDependency[] pkgs) throws IOException
+	void setDependencyInformation(PackageDependency[] pkgs) throws IOException
 	{
-		AbstractRemoteResource.setDebug(true);
+		//		AbstractRemoteResource.setDebug(true);
 		ArtifactResource[] artifactMatches = ArtifactResource.find(pkgs);
 		Map<String,ArtifactResource> matches = new HashMap<String,ArtifactResource>();
+		// System.err.println("FIND MATCH:");
 		for (ArtifactResource artifact : artifactMatches)
 		{
 			if(artifact != null)
 			{
 				String name = artifact.getPackageName();
+				// System.err.println("  * " + name);
 				if(!matches.containsKey(name))
 				{
 					matches.put(name, artifact);
@@ -159,7 +168,8 @@ public class DependencyAuditor
 		List<Long> scmIds = new LinkedList<Long>();
 		for(PackageDependency pkg: pkgs)
 		{
-			if(matches.containsKey(pkg.getName()))
+			String pkgName = pkg.getName();
+			if(matches.containsKey(pkgName))
 			{
 				ArtifactResource artifact = matches.get(pkg.getName());
 				long scmId = artifact.getScmId();
@@ -170,6 +180,10 @@ public class DependencyAuditor
 					packages.add(pkg);
 					scmIds.add(artifact.getScmId());
 				}
+			}
+			else
+			{
+				//System.err.println("ZOUNDS: " + pkgName + " has no matching artifact");
 			}
 		}
 
