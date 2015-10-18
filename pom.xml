@@ -4,11 +4,11 @@
 
 	<groupId>net.ossindex</groupId>
 	<artifactId>ossindex-maven-plugin</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.1</version>
 	<packaging>maven-plugin</packaging>
 
 	<name>${project.groupId}:${project.artifactId}</name>
-	<description>OSS Index Dependency/Vulnerability maven audit plugin</description>
+	<description>OSS Index Dependency/Vulnerability audit Maven Plugin</description>
 	<url>https://github.com/OSSIndex/ossindex-maven-plugin</url>
 
 	<licenses>
@@ -31,7 +31,7 @@
 		<connection>scm:git:git@github.com:OSSIndex/ossindex-maven-plugin.git</connection>
 		<url>https://github.com/OSSIndex/ossindex-maven-plugin</url>
 		<developerConnection>scm:git:git@github.com-OSSIndex:OSSIndex/ossindex-maven-plugin.git</developerConnection>
-		<tag>HEAD</tag>
+		<tag>ossindex-maven-plugin-0.0.1</tag>
 	</scm>
 
 	<distributionManagement>
@@ -63,7 +63,7 @@
 			<plugin>
 				<groupId>net.ossindex</groupId>
 				<artifactId>ossindex-maven-plugin</artifactId>
-				<version>0.0.1-SNAPSHOT</version>
+				<version>0.0.1</version>
 			</plugin>
 		</plugins>
 
@@ -94,7 +94,7 @@
 										</goals>
 									</pluginExecutionFilter>
 									<action>
-										<ignore></ignore>
+										<ignore />
 									</action>
 								</pluginExecution>
 							</pluginExecutions>
@@ -116,6 +116,29 @@
 							<phase>verify</phase>
 							<goals>
 								<goal>sign</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-plugin-plugin</artifactId>
+					<version>3.2</version>
+					<configuration>
+						<goalPrefix>sample-maven-plugin</goalPrefix>
+						<skipErrorNoDescriptorsFound>true</skipErrorNoDescriptorsFound>
+					</configuration>
+					<executions>
+						<execution>
+							<id>mojo-descriptor</id>
+							<goals>
+								<goal>descriptor</goal>
+							</goals>
+						</execution>
+						<execution>
+							<id>help-goal</id>
+							<goals>
+								<goal>helpmojo</goal>
 							</goals>
 						</execution>
 					</executions>
