@@ -71,7 +71,6 @@ public class OssIndexMojo extends AbstractMojo
 	 * The current repository/network configuration of Maven.
 	 * 
 	 * @parameter default-value="${repositorySystemSession}"
-	 * @readonly
 	 */
 	@Parameter(defaultValue="${repositorySystemSession}", readonly = true)
 	private RepositorySystemSession repoSession;
@@ -80,7 +79,6 @@ public class OssIndexMojo extends AbstractMojo
 	 * The project's remote repositories to use for the resolution of project dependencies.
 	 * 
 	 * @parameter default-value="${project.remoteProjectRepositories}"
-	 * @readonly
 	 */
 	@Parameter(defaultValue="${project.remoteProjectRepositories}", readonly = true)
 	private List<RemoteRepository> projectRepos;
@@ -89,13 +87,12 @@ public class OssIndexMojo extends AbstractMojo
 	 * The project's remote repositories to use for the resolution of plugins and their dependencies.
 	 * 
 	 * @parameter default-value="${project.remotePluginRepositories}"
-	 * @readonly
 	 */
 	@Parameter(defaultValue="${project.remotePluginRepositories}", readonly = true)
 	private List<RemoteRepository> pluginRepos;
 
 	/**
-	 * 
+	 * @parameter default-value="${project}"
 	 */
 	@Parameter(defaultValue="${project}", readonly = true, required = true)
 	private MavenProject project;
@@ -110,35 +107,42 @@ public class OssIndexMojo extends AbstractMojo
 	{
 		DependencyAuditor auditor = new DependencyAuditor(repoSystem, repoSession);
 
-		getLog().info("OSS Index dependency audit");
-		
-		int failures = 0;
-		@SuppressWarnings("unchecked")
-		List<Dependency> deps = project.getDependencies();
-		for (Dependency dep : deps)
+		try
 		{
-			try
+			getLog().info("OSS Index dependency audit");
+
+			int failures = 0;
+			@SuppressWarnings("unchecked")
+			List<Dependency> deps = project.getDependencies();
+			for (Dependency dep : deps)
 			{
-				Collection<PackageDependency> auditedDependencies = auditor.auditArtifact(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
-				for (PackageDependency adep : auditedDependencies)
+				try
 				{
-					failures += report(adep);
+					Collection<PackageDependency> auditedDependencies = auditor.auditArtifact(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
+					for (PackageDependency adep : auditedDependencies)
+					{
+						failures += report(adep);
+					}
+				}
+				catch (SocketException e)
+				{
+					getLog().error(e.getMessage());
+					break;
+				}
+				catch (IOException e)
+				{
+					getLog().error("Exception auditing dependency " + dep.getGroupId() + ":" + dep.getArtifactId() + ":" + dep.getVersion(), e);
 				}
 			}
-			catch (SocketException e)
+
+			if(failures > 0)
 			{
-				getLog().error(e.getMessage());
-				break;
-			}
-			catch (IOException e)
-			{
-				getLog().error("Exception auditing dependency " + dep.getGroupId() + ":" + dep.getArtifactId() + ":" + dep.getVersion(), e);
+				throw new MojoFailureException(failures + " known vulnerabilities affecting project dependencies");
 			}
 		}
-		
-		if(failures > 0)
+		finally
 		{
-			throw new MojoFailureException(failures + " known vulnerabilities affecting project dependencies");
+			auditor.close();
 		}
 	}
 
@@ -146,7 +150,7 @@ public class OssIndexMojo extends AbstractMojo
 	 * 
 	 * @param adep List of package dependency information (with applicable audit information)
 	 * @return Number of applicable vulnerabilities (indicating failure)
-	 * @throws IOException
+	 * @throws IOException On error
 	 */
 	private int report(PackageDependency adep) throws IOException
 	{
@@ -170,7 +174,7 @@ public class OssIndexMojo extends AbstractMojo
 						URI uri = vulnerability.getUri();
 						String description = vulnerability.getDescription();
 					}
-					
+
 					if(myVulnerabilities.isEmpty())
 					{
 						getLog().info(pkgId + "  " + vulnerabilities.length + " known vulnerabilities, 0 affecting installed version");
@@ -208,7 +212,7 @@ public class OssIndexMojo extends AbstractMojo
 		{
 			getLog().info(pkgId + "  Unknown source for package");
 		}
-		
+
 		return failures;
 	}
 

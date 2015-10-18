@@ -26,6 +26,7 @@
  */
 package net.ossindex.maven.utils;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
@@ -33,6 +34,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import net.ossindex.common.ResourceFactory;
+import net.ossindex.common.cache.MapDbCache;
 import net.ossindex.common.resource.ArtifactResource;
 import net.ossindex.common.resource.ScmResource;
 import net.ossindex.common.utils.PackageDependency;
@@ -66,20 +69,52 @@ public class DependencyAuditor
 	 */
 	DependencyAuditor()
 	{
+		File root = getCacheDir();
+		if(root != null)
+		{
+			ResourceFactory.getResourceFactory().setCache(new MapDbCache(getCacheDir()));
+		}
 	}
 
+	/** Make a new dependency auditor
+	 * 
+	 * @param repoSystem Maven repository system
+	 * @param session Maven repository system session
+	 */
 	public DependencyAuditor(RepositorySystem repoSystem, RepositorySystemSession session)
 	{
+		File root = getCacheDir();
+		if(root != null)
+		{
+			ResourceFactory.getResourceFactory().setCache(new MapDbCache(getCacheDir()));
+		}
 		this.repoSystem = repoSystem;
 		this.session = session;
 	}
 
+	/** Get a cache directory
+	 * 
+	 * @return The cache directory
+	 */
+	private File getCacheDir()
+	{
+		File tmp = new File(System.getProperty("java.io.tmpdir"));
+		File root = new File(tmp, "ossindex.cache");
+		if(tmp.exists())
+		{
+			if(!root.exists()) root.mkdirs();
+			if(root.exists() && root.isDirectory()) return root;
+		}
+		return null;
+	}
+
 	/** Audit the artifact and its dependencies
 	 * 
-	 * @param groupId
-	 * @param artifactId
-	 * @param version
-	 * @throws IOException 
+	 * @param groupId Artifact group ID
+	 * @param artifactId Artifact OD
+	 * @param version Version number
+	 * @throws IOException On error
+	 * @return Collection of dependencies
 	 */
 	public Collection<PackageDependency> auditArtifact(String groupId, String artifactId, String version) throws IOException
 	{
@@ -91,10 +126,10 @@ public class DependencyAuditor
 
 	/** Find all of the dependencies for a specified artifact
 	 * 
-	 * @param groupId
-	 * @param artifactId
-	 * @param version
-	 * @return
+	 * @param groupId Artifact group ID
+	 * @param artifactId Artifact OD
+	 * @param version Version number
+	 * @return List of package dependencies
 	 */
 	private List<PackageDependency> getPackageDependencies(String groupId, String artifactId, String version)
 	{
@@ -137,13 +172,13 @@ public class DependencyAuditor
 	 * 
 	 * Package protected to allow us to test
 	 * 
-	 * @param array
-	 * @throws IOException 
+	 * @param pkgs Packages to retrieve additional information from OSS Index for
+	 * @throws IOException On error 
 	 */
 	void setDependencyInformation(PackageDependency[] pkgs) throws IOException
 	{
 		//		AbstractRemoteResource.setDebug(true);
-		ArtifactResource[] artifactMatches = ArtifactResource.find(pkgs);
+		ArtifactResource[] artifactMatches = ResourceFactory.getResourceFactory().findArtifactResources(pkgs);
 		Map<String,ArtifactResource> matches = new HashMap<String,ArtifactResource>();
 		// System.err.println("FIND MATCH:");
 		for (ArtifactResource artifact : artifactMatches)
@@ -188,7 +223,7 @@ public class DependencyAuditor
 		}
 
 		Long[] tmp = scmIds.toArray(new Long[scmIds.size()]);
-		ScmResource[] scmResources = ScmResource.find(ArrayUtils.toPrimitive(tmp));
+		ScmResource[] scmResources = ResourceFactory.getResourceFactory().findScmResources(ArrayUtils.toPrimitive(tmp));
 		// This should never happen
 		if(scmResources == null) return;
 
@@ -197,6 +232,14 @@ public class DependencyAuditor
 			PackageDependency pkg = packages.get(i);
 			pkg.setScm(scmResources[i]);
 		}
+	}
+
+	/**
+	 * Close the cache, required for clean running
+	 */
+	public void close()
+	{
+		ResourceFactory.getResourceFactory().closeCache();
 	}
 
 }
