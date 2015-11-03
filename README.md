@@ -131,13 +131,16 @@ log output for the build will contain something like this:
 Package Initialization
 ----------------------
 
-OSS Index has vast stores of information about packages, vulnerabilities, and source repositories. Notification by ossindex-maven-plugin about these vulnerabilities require that this information be cross referenced with each other, which requires some manual intervention.
+OSS Index has vast stores of information about packages, vulnerabilities, and source repositories. Notification by ossindex-maven-plugin about these vulnerabilities require that this information be cross referenced with each other, which requires manual intervention.
 
 If a requested package is open source, then it is queued on OSS Index servers and marked as requested. Our auditors will provide the required cross references as they are requested, though it may take a few days depending on load. Once the references are created they are persistent and do not require rebuilding.
 
 You should see the "Unknown source for package" messages disappearing. If such a message
 persists over a long time then either the package remains unknown or we cannot find related
 sources.
+
+Currently the likelyhood of seeing the "Unknown source for package" message is rather high,
+but will reduce over time (hopefully quickly).
 
 OSS Index will be providing an interface that will allow users to help improve results by
 adding unknown sources, packages, and vulnerabilities. Stay tuned!
