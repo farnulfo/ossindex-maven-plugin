@@ -113,7 +113,7 @@ Integration into Jenkins
 A simple way to integrate with Jenkins is as "post-build step", specifically
 under the "Invoke top-level Maven targets".
 
-<img src="docs/jenkins1.png" style="border: 1px solid black;"/>
+![Jenkins config](docs/jenkins1.png)
 
 * Go to the configuration for your Jenkins project
 * Find and click the "Add post-build step" drop down
@@ -121,12 +121,12 @@ under the "Invoke top-level Maven targets".
 * Enter "net.ossindex:ossindex-maven-plugin:audit" as the goal
 * Select Apply/Save and re-run your build
 
-<img src="docs/jenkins2.png" style="border: 1px solid black; width: 600px;"/>
+![Jenkins config](docs/jenkins2.png)
 
 If a vulnerability is detected in a dependency the build will indicate a failure and
 log output for the build will contain something like this:
 
-<img src="docs/jenkins-err.png" style="border: 1px solid black; width: 600px;"/>
+![Jenkins error](docs/jenkins-err.png)
 
 Package Initialization
 ----------------------
