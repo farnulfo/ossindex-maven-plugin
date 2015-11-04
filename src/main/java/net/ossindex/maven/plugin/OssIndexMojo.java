@@ -184,6 +184,11 @@ public class OssIndexMojo extends AbstractMojo
 						getLog().error("");
 						getLog().error("--------------------------------------------------------------");
 						getLog().error(pkgId + "  [VULNERABLE]");
+						PackageDependency parent = adep.getParent();
+						if(parent != null)
+						{
+							getLog().error("  required by " + parent.getId());
+						}
 						getLog().error(vulnerabilities.length + " known vulnerabilities, " + myVulnerabilities.size() + " affecting installed version");
 						getLog().error("");
 						for (VulnerabilityResource vulnerability : myVulnerabilities)

@@ -232,14 +232,14 @@
 			<version>3.0-alpha-2</version>
 		</dependency>
 		<dependency>
-			<groupId>net.ossindex</groupId>
-			<artifactId>ossindex-api</artifactId>
-			<version>0.0.2</version>
-		</dependency>
-		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-lang3</artifactId>
 			<version>3.4</version>
+		</dependency>
+		<dependency>
+			<groupId>net.ossindex</groupId>
+			<artifactId>ossindex-api</artifactId>
+			<version>0.0.5</version>
 		</dependency>
 	</dependencies>
 </project>

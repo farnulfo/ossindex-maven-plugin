@@ -181,7 +181,6 @@ public class DependencyAuditor
 		//		AbstractRemoteResource.setDebug(true);
 		ArtifactResource[] artifactMatches = ResourceFactory.getResourceFactory().findArtifactResources(pkgs);
 		Map<String,ArtifactResource> matches = new HashMap<String,ArtifactResource>();
-		// System.err.println("FIND MATCH:");
 		for (ArtifactResource artifact : artifactMatches)
 		{
 			if(artifact != null)
@@ -232,6 +231,10 @@ public class DependencyAuditor
 		{
 			PackageDependency pkg = packages.get(i);
 			pkg.setScm(scmResources[i]);
+			if(!pkg.equals(pkgs[0]))
+			{
+				pkg.setParent(pkgs[0]);
+			}
 		}
 	}
 
