@@ -30,13 +30,10 @@ import java.io.IOException;
 import java.net.SocketException;
 import java.net.URI;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-
-import net.ossindex.common.resource.ScmResource;
-import net.ossindex.common.resource.VulnerabilityResource;
-import net.ossindex.common.utils.PackageDependency;
-import net.ossindex.maven.utils.DependencyAuditor;
+import java.util.Set;
 
 import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.AbstractMojo;
@@ -49,6 +46,11 @@ import org.apache.maven.project.MavenProject;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
+
+import net.ossindex.common.resource.ScmResource;
+import net.ossindex.common.resource.VulnerabilityResource;
+import net.ossindex.common.utils.PackageDependency;
+import net.ossindex.maven.utils.DependencyAuditor;
 
 /** Cross reference the project against information in OSS Index to identify
  * security and maintenance problems.
@@ -96,6 +98,19 @@ public class OssIndexMojo extends AbstractMojo
 	 */
 	@Parameter(defaultValue="${project}", readonly = true, required = true)
 	private MavenProject project;
+	
+	/**
+	 * Comma separated list of artifacts to ignore errors for
+	 */
+	@Parameter(property = "audit.ignore", defaultValue = "")
+	private String ignore;
+	private Set<String> ignoreSet = new HashSet<String>();
+	
+	/**
+	 * Should the plugin cause a build failure?
+	 */
+	@Parameter(property = "audit.fail_on_error", defaultValue = "true")
+	private String failOnError;
 
 	// Your other mojo parameters and code here
 	/*
@@ -105,6 +120,18 @@ public class OssIndexMojo extends AbstractMojo
 	@Override
 	public void execute() throws MojoExecutionException, MojoFailureException
 	{
+		if(ignore != null)
+		{
+			ignore = ignore.trim();
+			if(!ignore.isEmpty())
+			{
+				String[] tokens = ignore.split(",");
+				for (String token : tokens)
+				{
+					ignoreSet.add(token.trim());
+				}
+			}
+		}
 		DependencyAuditor auditor = new DependencyAuditor(repoSystem, repoSession);
 
 		try
@@ -121,7 +148,11 @@ public class OssIndexMojo extends AbstractMojo
 					Collection<PackageDependency> auditedDependencies = auditor.auditArtifact(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
 					for (PackageDependency adep : auditedDependencies)
 					{
-						failures += report(adep);
+						String id = adep.getGroupId() + ":" + adep.getName();
+						if(!ignoreSet.contains(id))
+						{
+							failures += report(adep);
+						}
 					}
 				}
 				catch (SocketException e)
@@ -137,7 +168,10 @@ public class OssIndexMojo extends AbstractMojo
 
 			if(failures > 0)
 			{
-				throw new MojoFailureException(failures + " known vulnerabilities affecting project dependencies");
+				if("true".equals(failOnError))
+				{
+					throw new MojoFailureException(failures + " known vulnerabilities affecting project dependencies");
+				}
 			}
 		}
 		finally
