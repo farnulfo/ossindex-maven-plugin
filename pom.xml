@@ -3,7 +3,7 @@
 
 	<groupId>net.ossindex</groupId>
 	<artifactId>ossindex-maven-plugin</artifactId>
-	<version>0.0.13</version>
+	<version>0.0.14-SNAPSHOT</version>
 	<packaging>maven-plugin</packaging>
 
 	<name>${project.groupId}:${project.artifactId}</name>
@@ -30,7 +30,7 @@
 		<connection>scm:git:git@github.com:OSSIndex/ossindex-maven-plugin.git</connection>
 		<url>https://github.com/OSSIndex/ossindex-maven-plugin</url>
 		<developerConnection>scm:git:git@github.com-OSSIndex:OSSIndex/ossindex-maven-plugin.git</developerConnection>
-		<tag>ossindex-maven-plugin-0.0.13</tag>
+		<tag>HEAD</tag>
 	</scm>
 
 	<distributionManagement>
@@ -55,7 +55,7 @@
 			<plugin>
 				<groupId>net.ossindex</groupId>
 				<artifactId>ossindex-maven-plugin</artifactId>
-				<version>0.0.13</version>
+				<version>0.0.14-SNAPSHOT</version>
 			</plugin>
 			<plugin>
 				<artifactId>maven-compiler-plugin</artifactId>
