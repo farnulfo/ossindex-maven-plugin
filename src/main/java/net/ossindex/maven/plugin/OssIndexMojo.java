@@ -102,14 +102,14 @@ public class OssIndexMojo extends AbstractMojo
 	/**
 	 * Comma separated list of artifacts to ignore errors for
 	 */
-	@Parameter(property = "audit.ignore", defaultValue = "")
+	@Parameter(property = "ignore", defaultValue = "")
 	private String ignore;
 	private Set<String> ignoreSet = new HashSet<String>();
 	
 	/**
 	 * Should the plugin cause a build failure?
 	 */
-	@Parameter(property = "audit.fail_on_error", defaultValue = "true")
+	@Parameter(property = "fail_on_error", defaultValue = "true")
 	private String failOnError;
 
 	// Your other mojo parameters and code here
