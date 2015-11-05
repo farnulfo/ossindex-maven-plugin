@@ -149,7 +149,8 @@ public class OssIndexMojo extends AbstractMojo
 					for (PackageDependency adep : auditedDependencies)
 					{
 						String id = adep.getGroupId() + ":" + adep.getName();
-						if(!ignoreSet.contains(id))
+						String idVer = id + ":" + adep.getVersion();
+						if(!ignoreSet.contains(id) && !ignoreSet.contains(idVer))
 						{
 							failures += report(adep);
 						}
