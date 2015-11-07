@@ -101,15 +101,19 @@ public class OssIndexMojo extends AbstractMojo
 	
 	/**
 	 * Comma separated list of artifacts to ignore errors for
+	 * 
+	 * @parameter
 	 */
-	@Parameter(property = "ignore", defaultValue = "")
+	@Parameter(property = "audit.ignore", defaultValue = "")
 	private String ignore;
 	private Set<String> ignoreSet = new HashSet<String>();
 	
 	/**
 	 * Should the plugin cause a build failure?
+	 * 
+	 * @parameter
 	 */
-	@Parameter(property = "fail_on_error", defaultValue = "true")
+	@Parameter(property = "audit.failOnError", defaultValue = "true")
 	private String failOnError;
 
 	// Your other mojo parameters and code here
@@ -206,7 +210,9 @@ public class OssIndexMojo extends AbstractMojo
 						{
 							myVulnerabilities.add(vulnerability);
 						}
+						@SuppressWarnings("unused")
 						URI uri = vulnerability.getUri();
+						@SuppressWarnings("unused")
 						String description = vulnerability.getDescription();
 					}
 
