@@ -21,7 +21,13 @@ Usage
 -----
 
 ```
-mvn net.ossindex:ossindex-maven-plugin:audit
+mvn <phase> net.ossindex:ossindex-maven-plugin:audit
+```
+
+A phase is required to ensure that all dependencies are correctly identified. For example:
+
+```
+mvn <compile> net.ossindex:ossindex-maven-plugin:audit
 ```
 
 ### Success output
