@@ -26,6 +26,7 @@
  */
 package net.ossindex.maven.utils;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -108,4 +109,25 @@ public class DependencyAuditorTests
 		}
 		assertTrue(vulnerable);
 	}
+	@Test
+	public void testHttpclient() throws IOException
+	{
+		PackageDependency dep = new PackageDependency("maven", "org.apache.httpcomponents", "httpclient", "4.3.6");
+		auditor.setDependencyInformation(new PackageDependency[] {dep});
+		ScmResource scm = dep.getScm();
+		assertNotNull(scm);
+		assertNotNull(scm.getVulnerabilities());
+		for(VulnerabilityResource vulnerability: scm.getVulnerabilities())
+		{
+			String[] versions = vulnerability.getVersions();
+			assertNotNull(versions);
+			if(vulnerability.appliesTo(dep.getVersion()))
+			{
+				System.err.println("WAT: " + dep.getVersion());
+				System.err.println("WAT: " + vulnerability.getId());
+			}
+			assertFalse(vulnerability.appliesTo(dep.getVersion()));
+		}
+	}
+
 }
