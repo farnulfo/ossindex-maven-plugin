@@ -35,6 +35,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -115,6 +118,14 @@ public class OssIndexMojo extends AbstractMojo
 	 */
 	@Parameter(property = "audit.failOnError", defaultValue = "true")
 	private String failOnError;
+
+	static
+	{
+		// Default log4j configuration. Hides configuration warnings.
+		BasicConfigurator.configure();
+		Logger.getRootLogger().setLevel(Level.WARN);
+	}
+
 
 	// Your other mojo parameters and code here
 	/*
