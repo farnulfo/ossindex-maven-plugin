@@ -3,7 +3,7 @@
 
 	<groupId>net.ossindex</groupId>
 	<artifactId>ossindex-maven-plugin</artifactId>
-	<version>0.1.2-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<packaging>maven-plugin</packaging>
 
 	<name>${project.groupId}:${project.artifactId}</name>
@@ -298,7 +298,12 @@
 		<dependency>
 			<groupId>net.ossindex</groupId>
 			<artifactId>ossindex-api</artifactId>
-			<version>0.0.8</version>
+			<version>1.0.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.sun.mail</groupId>
+			<artifactId>javax.mail</artifactId>
+			<version>1.5.4</version>
 		</dependency>
 	</dependencies>
 </project>

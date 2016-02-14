@@ -50,7 +50,7 @@ import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
 
-import net.ossindex.common.resource.ScmResource;
+import net.ossindex.common.resource.ProjectResource;
 import net.ossindex.common.resource.VulnerabilityResource;
 import net.ossindex.common.utils.PackageDependency;
 import net.ossindex.maven.utils.DependencyAuditor;
@@ -206,10 +206,10 @@ public class OssIndexMojo extends AbstractMojo
 	{
 		int failures = 0;
 		String pkgId = adep.getId();
-		ScmResource scm = adep.getScm();
-		if(scm != null)
+		ProjectResource project = adep.getProject();
+		if(project != null)
 		{
-			VulnerabilityResource[] vulnerabilities = scm.getVulnerabilities();
+			VulnerabilityResource[] vulnerabilities = project.getVulnerabilities();
 			if(vulnerabilities != null)
 			{
 				if(vulnerabilities.length > 0)

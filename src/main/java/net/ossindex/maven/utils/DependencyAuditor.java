@@ -34,12 +34,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import net.ossindex.common.ResourceFactory;
-import net.ossindex.common.cache.MapDbCache;
-import net.ossindex.common.resource.ArtifactResource;
-import net.ossindex.common.resource.ScmResource;
-import net.ossindex.common.utils.PackageDependency;
-
 import org.apache.commons.lang3.ArrayUtils;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
@@ -52,6 +46,12 @@ import org.eclipse.aether.graph.DependencyNode;
 import org.eclipse.aether.resolution.DependencyRequest;
 import org.eclipse.aether.resolution.DependencyResolutionException;
 import org.eclipse.aether.util.graph.visitor.PreorderNodeListGenerator;
+
+import net.ossindex.common.ResourceFactory;
+import net.ossindex.common.cache.MapDbCache;
+import net.ossindex.common.resource.ArtifactResource;
+import net.ossindex.common.resource.ProjectResource;
+import net.ossindex.common.utils.PackageDependency;
 
 /** Utility code that performs the Maven dependency auditing. Written in a manner
  * that will allow it to be used within Maven plugins as well as outside.
@@ -223,14 +223,14 @@ public class DependencyAuditor
 		}
 
 		Long[] tmp = scmIds.toArray(new Long[scmIds.size()]);
-		ScmResource[] scmResources = ResourceFactory.getResourceFactory().findScmResources(ArrayUtils.toPrimitive(tmp));
+		ProjectResource[] projectResources = ResourceFactory.getResourceFactory().findProjectResources(ArrayUtils.toPrimitive(tmp));
 		// This should never happen
-		if(scmResources == null) return;
+		if(projectResources == null) return;
 
 		for(int i = 0; i < packages.size(); i++)
 		{
 			PackageDependency pkg = packages.get(i);
-			pkg.setScm(scmResources[i]);
+			pkg.setProject(projectResources[i]);
 			if(!pkg.equals(pkgs[0]))
 			{
 				pkg.setParent(pkgs[0]);
