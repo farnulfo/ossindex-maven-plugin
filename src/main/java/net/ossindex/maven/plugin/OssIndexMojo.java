@@ -200,17 +200,17 @@ public class OssIndexMojo extends AbstractMojo
 	{
 		int failures = 0;
 		String pkgId = pkg.getGroup() + ":" + pkg.getName() + ":" + pkg.getVersion();
+		int total = pkg.getVulnerabilityTotal();
 
 		List<VulnerabilityDescriptor> vulnerabilities = pkg.getVulnerabilities();
 		if (vulnerabilities != null && !vulnerabilities.isEmpty()) {
-			int total = pkg.getVulnerabilityTotal();
 			int matches = pkg.getVulnerabilityMatches();
 			getLog().error("");
 			getLog().error("--------------------------------------------------------------");
 			getLog().error(pkgId + "  [VULNERABLE]");
 			if(parent != null)
 			{
-				String parentId = pkg.getGroup() + ":" + pkg.getName()  + ":" + pkg.getVersion();
+				String parentId = parent.getGroup() + ":" + parent.getName()  + ":" + parent.getVersion();
 				getLog().error("  required by " + parentId);
 			}
 			getLog().error(total + " known vulnerabilities, " + matches + " affecting installed version");
@@ -225,7 +225,11 @@ public class OssIndexMojo extends AbstractMojo
 			getLog().error("");
 			failures += matches;
 		} else {
-			getLog().info(pkgId + "  No known vulnerabilities");
+			if (total > 0) {
+				getLog().info(pkgId + ": " + total + " known vulnerabilities, 0 affecting installed version");
+			} else {
+				getLog().info(pkgId + ": No known vulnerabilities");
+			}
 		}
 
 		return failures;

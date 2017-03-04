@@ -90,21 +90,20 @@ public class DependencyAuditor
 	public void add(String groupId, String artifactId, String version)
 	{
 		PackageDescriptor parent = request.add("maven", groupId, artifactId, version);
-		List<PackageDescriptor> children = addPackageDependencies(groupId, artifactId, version);
-		for (PackageDescriptor child : children) {
-			parents.put(child, parent);
-		}
+		parents.put(parent, null);
+		addPackageDependencies(parent, groupId, artifactId, version);
 	}
 
 
 	/** Find all of the dependencies for a specified artifact
+	 * @param parent 
 	 * 
 	 * @param groupId Artifact group ID
 	 * @param artifactId Artifact OD
 	 * @param version Version number
 	 * @return List of package dependencies
 	 */
-	private List<PackageDescriptor> addPackageDependencies(String groupId, String artifactId, String version)
+	private List<PackageDescriptor> addPackageDependencies(PackageDescriptor parent, String groupId, String artifactId, String version)
 	{
 		List<PackageDescriptor> packageDependency = new LinkedList<PackageDescriptor>();
 		String aid = groupId + ":" + artifactId + ":";
@@ -129,8 +128,13 @@ public class DependencyAuditor
 			List<Artifact> artifacts = nlg.getArtifacts(false);
 			for (Artifact artifact : artifacts)
 			{
-				PackageDescriptor pkgDep = request.add("maven", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
-				packageDependency.add(pkgDep);
+				PackageDescriptor pkgDep = new PackageDescriptor("maven", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+				// Only include each package once. They might be transitive dependencies from multiple places.
+				if (!parents.containsKey(pkgDep)) {
+					pkgDep = request.add("maven", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+					parents.put(pkgDep, parent);
+					packageDependency.add(pkgDep);
+				}
 			}
 		}
 		catch(DependencyCollectionException | DependencyResolutionException e)
@@ -141,10 +145,20 @@ public class DependencyAuditor
 		return packageDependency;
 	}
 	
+	/**
+	 * Run the audit
+	 * @return The results collection
+	 * @throws IOException On error
+	 */
 	public Collection<PackageDescriptor> run() throws IOException {
 		return request.run();
 	}
 
+	/** Get the parent for the specified package
+	 * 
+	 * @param pkg
+	 * @return
+	 */
 	public PackageDescriptor getParent(PackageDescriptor pkg) {
 		return parents.get(pkg);
 	}

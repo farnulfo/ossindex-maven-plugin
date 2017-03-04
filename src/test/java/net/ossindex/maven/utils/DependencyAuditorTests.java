@@ -26,8 +26,13 @@
  */
 package net.ossindex.maven.utils;
 
+import static org.junit.Assert.*;
+
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Test;
+
+import net.ossindex.common.PackageDescriptor;
 
 /** Test the dependency auditor
  * 
@@ -49,7 +54,7 @@ public class DependencyAuditorTests
 	{
 		auditor.close();
 	}
-	
+		
 //	@Test
 //	public void testCommonsLang3() throws IOException
 //	{
