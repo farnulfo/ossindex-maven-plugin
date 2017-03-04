@@ -1,5 +1,5 @@
 /**
- *	Copyright (c) 2015 Vör Security Inc.
+ *	Copyright (c) 2015-2017 Vör Security Inc.
  *	All rights reserved.
  *	
  *	Redistribution and use in source and binary forms, with or without
@@ -26,7 +26,6 @@
  */
 package net.ossindex.maven.utils;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
@@ -34,7 +33,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.artifact.Artifact;
@@ -47,20 +45,24 @@ import org.eclipse.aether.resolution.DependencyRequest;
 import org.eclipse.aether.resolution.DependencyResolutionException;
 import org.eclipse.aether.util.graph.visitor.PreorderNodeListGenerator;
 
-import net.ossindex.common.ResourceFactory;
-import net.ossindex.common.cache.MapDbCache;
-import net.ossindex.common.resource.ArtifactResource;
-import net.ossindex.common.resource.ProjectResource;
-import net.ossindex.common.utils.PackageDependency;
+import net.ossindex.common.IPackageRequest;
+import net.ossindex.common.OssIndexApi;
+import net.ossindex.common.PackageDescriptor;
 
 /** Utility code that performs the Maven dependency auditing. Written in a manner
  * that will allow it to be used within Maven plugins as well as outside.
+ * 
+ * This gathers the transitive dependencies and remembers them, and at the same time
+ * assembled a request that is run against OSS Index.
  * 
  * @author Ken Duck
  *
  */
 public class DependencyAuditor
 {
+	private Map<PackageDescriptor,PackageDescriptor> parents = new HashMap<PackageDescriptor,PackageDescriptor>();
+	private IPackageRequest request = OssIndexApi.createPackageRequest();
+	
 	private RepositorySystem repoSystem;
 	private RepositorySystemSession session;
 
@@ -69,11 +71,6 @@ public class DependencyAuditor
 	 */
 	DependencyAuditor()
 	{
-		File root = getCacheDir();
-		if(root != null)
-		{
-			ResourceFactory.getResourceFactory().setCache(new MapDbCache(getCacheDir()));
-		}
 	}
 
 	/** Make a new dependency auditor
@@ -83,44 +80,20 @@ public class DependencyAuditor
 	 */
 	public DependencyAuditor(RepositorySystem repoSystem, RepositorySystemSession session)
 	{
-		File root = getCacheDir();
-		if(root != null)
-		{
-			ResourceFactory.getResourceFactory().setCache(new MapDbCache(getCacheDir()));
-		}
 		this.repoSystem = repoSystem;
 		this.session = session;
 	}
 
-	/** Get a cache directory
-	 * 
-	 * @return The cache directory
+	/**
+	 * Add an artifact and its dependencies to the request
 	 */
-	private File getCacheDir()
+	public void add(String groupId, String artifactId, String version)
 	{
-		File tmp = new File(System.getProperty("java.io.tmpdir"));
-		File root = new File(tmp, "ossindex.cache");
-		if(tmp.exists())
-		{
-			if(!root.exists()) root.mkdirs();
-			if(root.exists() && root.isDirectory()) return root;
+		PackageDescriptor parent = request.add("maven", groupId, artifactId, version);
+		List<PackageDescriptor> children = addPackageDependencies(groupId, artifactId, version);
+		for (PackageDescriptor child : children) {
+			parents.put(child, parent);
 		}
-		return null;
-	}
-
-	/** Audit the artifact and its dependencies
-	 * 
-	 * @param groupId Artifact group ID
-	 * @param artifactId Artifact OD
-	 * @param version Version number
-	 * @throws IOException On error
-	 * @return Collection of dependencies
-	 */
-	public Collection<PackageDependency> auditArtifact(String groupId, String artifactId, String version) throws IOException
-	{
-		List<PackageDependency> deps = getPackageDependencies(groupId, artifactId, version);
-		setDependencyInformation(deps.toArray(new PackageDependency[deps.size()]));
-		return deps;
 	}
 
 
@@ -131,9 +104,9 @@ public class DependencyAuditor
 	 * @param version Version number
 	 * @return List of package dependencies
 	 */
-	private List<PackageDependency> getPackageDependencies(String groupId, String artifactId, String version)
+	private List<PackageDescriptor> addPackageDependencies(String groupId, String artifactId, String version)
 	{
-		List<PackageDependency> packageDependency = new LinkedList<PackageDependency>();
+		List<PackageDescriptor> packageDependency = new LinkedList<PackageDescriptor>();
 		String aid = groupId + ":" + artifactId + ":";
 		if(version != null) aid += version;
 		Dependency dependency = new Dependency( new DefaultArtifact( aid ), "compile" );
@@ -156,7 +129,7 @@ public class DependencyAuditor
 			List<Artifact> artifacts = nlg.getArtifacts(false);
 			for (Artifact artifact : artifacts)
 			{
-				PackageDependency pkgDep = new PackageDependency("maven", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+				PackageDescriptor pkgDep = request.add("maven", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
 				packageDependency.add(pkgDep);
 			}
 		}
@@ -167,83 +140,19 @@ public class DependencyAuditor
 		}
 		return packageDependency;
 	}
-
-	/** Query OSS Index to get useful information about the dependencies. Sets the
-	 * information in the appropriate package dependency.
-	 * 
-	 * Package protected to allow us to test
-	 * 
-	 * @param pkgs Packages to retrieve additional information from OSS Index for
-	 * @throws IOException On error 
-	 */
-	void setDependencyInformation(PackageDependency[] pkgs) throws IOException
-	{
-		//		AbstractRemoteResource.setDebug(true);
-		ArtifactResource[] artifactMatches = ResourceFactory.getResourceFactory().findArtifactResources(pkgs);
-		Map<String,ArtifactResource> matches = new HashMap<String,ArtifactResource>();
-		for (ArtifactResource artifact : artifactMatches)
-		{
-			if(artifact != null)
-			{
-				String name = artifact.getPackageName();
-				// System.err.println("  * " + name);
-				if(!matches.containsKey(name))
-				{
-					matches.put(name, artifact);
-				}
-				else
-				{
-					ArtifactResource ar = matches.get(name);
-					if(artifact.compareTo(ar) > 0) matches.put(name, artifact);
-				}
-			}
-		}
-
-		List<PackageDependency> packages = new LinkedList<PackageDependency>();
-		List<Long> scmIds = new LinkedList<Long>();
-		for(PackageDependency pkg: pkgs)
-		{
-			String pkgName = pkg.getName();
-			if(matches.containsKey(pkgName))
-			{
-				ArtifactResource artifact = matches.get(pkg.getName());
-				long scmId = artifact.getScmId();
-				// only continue with the artifact if it has a known SCM id.
-				if(scmId > 0)
-				{
-					pkg.setArtifact(artifact);
-					packages.add(pkg);
-					scmIds.add(artifact.getScmId());
-				}
-			}
-			else
-			{
-				//System.err.println("ZOUNDS: " + pkgName + " has no matching artifact");
-			}
-		}
-
-		Long[] tmp = scmIds.toArray(new Long[scmIds.size()]);
-		ProjectResource[] projectResources = ResourceFactory.getResourceFactory().findProjectResources(ArrayUtils.toPrimitive(tmp));
-		// This should never happen
-		if(projectResources == null) return;
-
-		for(int i = 0; i < packages.size(); i++)
-		{
-			PackageDependency pkg = packages.get(i);
-			pkg.setProject(projectResources[i]);
-			if(!pkg.equals(pkgs[0]))
-			{
-				pkg.setParent(pkgs[0]);
-			}
-		}
+	
+	public Collection<PackageDescriptor> run() throws IOException {
+		return request.run();
 	}
 
+	public PackageDescriptor getParent(PackageDescriptor pkg) {
+		return parents.get(pkg);
+	}
+	
 	/**
 	 * Close the cache, required for clean running
 	 */
 	public void close()
 	{
-		ResourceFactory.getResourceFactory().closeCache();
 	}
-
 }

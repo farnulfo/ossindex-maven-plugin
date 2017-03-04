@@ -1,5 +1,5 @@
 /**
- *	Copyright (c) 2015 Vör Security Inc.
+ *	Copyright (c) 2015-2017 Vör Security Inc.
  *	All rights reserved.
  *	
  *	Redistribution and use in source and binary forms, with or without
@@ -27,11 +27,8 @@
 package net.ossindex.maven.plugin;
 
 import java.io.IOException;
-import java.net.SocketException;
-import java.net.URI;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -50,9 +47,8 @@ import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
 
-import net.ossindex.common.resource.ProjectResource;
-import net.ossindex.common.resource.VulnerabilityResource;
-import net.ossindex.common.utils.PackageDependency;
+import net.ossindex.common.PackageDescriptor;
+import net.ossindex.common.VulnerabilityDescriptor;
 import net.ossindex.maven.utils.DependencyAuditor;
 
 /** Cross reference the project against information in OSS Index to identify
@@ -101,7 +97,7 @@ public class OssIndexMojo extends AbstractMojo
 	 */
 	@Parameter(defaultValue="${project}", readonly = true, required = true)
 	private MavenProject project;
-	
+
 	/**
 	 * Comma separated list of artifacts to ignore errors for
 	 * 
@@ -110,7 +106,7 @@ public class OssIndexMojo extends AbstractMojo
 	@Parameter(property = "audit.ignore", defaultValue = "")
 	private String ignore;
 	private Set<String> ignoreSet = new HashSet<String>();
-	
+
 	/**
 	 * Should the plugin cause a build failure?
 	 * 
@@ -155,30 +151,25 @@ public class OssIndexMojo extends AbstractMojo
 
 			int failures = 0;
 			@SuppressWarnings("unchecked")
+
 			List<Dependency> deps = project.getDependencies();
+			// Assemble the query
 			for (Dependency dep : deps)
 			{
-				try
+				auditor.add(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
+			}
+
+			// Perform the audit
+			Collection<PackageDescriptor> results = auditor.run();
+
+			// Analyze the results
+			for (PackageDescriptor pkg : results) {
+				String id = pkg.getGroup() + ":" + pkg.getName();
+				String idVer = id + ":" + pkg.getVersion();
+				if(!ignoreSet.contains(id) && !ignoreSet.contains(idVer))
 				{
-					Collection<PackageDependency> auditedDependencies = auditor.auditArtifact(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
-					for (PackageDependency adep : auditedDependencies)
-					{
-						String id = adep.getGroupId() + ":" + adep.getName();
-						String idVer = id + ":" + adep.getVersion();
-						if(!ignoreSet.contains(id) && !ignoreSet.contains(idVer))
-						{
-							failures += report(adep);
-						}
-					}
-				}
-				catch (SocketException e)
-				{
-					getLog().error(e.getMessage());
-					break;
-				}
-				catch (IOException e)
-				{
-					getLog().error("Exception auditing dependency " + dep.getGroupId() + ":" + dep.getArtifactId() + ":" + dep.getVersion(), e);
+					PackageDescriptor parent = auditor.getParent(pkg);
+					failures += report(parent, pkg);
 				}
 			}
 
@@ -189,6 +180,9 @@ public class OssIndexMojo extends AbstractMojo
 					throw new MojoFailureException(failures + " known vulnerabilities affecting project dependencies");
 				}
 			}
+		}
+		catch (IOException e) {
+			e.printStackTrace();
 		}
 		finally
 		{
@@ -202,72 +196,36 @@ public class OssIndexMojo extends AbstractMojo
 	 * @return Number of applicable vulnerabilities (indicating failure)
 	 * @throws IOException On error
 	 */
-	private int report(PackageDependency adep) throws IOException
+	private int report(PackageDescriptor parent, PackageDescriptor pkg) throws IOException
 	{
 		int failures = 0;
-		String pkgId = adep.getId();
-		ProjectResource project = adep.getProject();
-		if(project != null)
-		{
-			VulnerabilityResource[] vulnerabilities = project.getVulnerabilities();
-			if(vulnerabilities != null)
-			{
-				if(vulnerabilities.length > 0)
-				{
-					List<VulnerabilityResource> myVulnerabilities = new LinkedList<VulnerabilityResource>();
-					for (VulnerabilityResource vulnerability : vulnerabilities)
-					{
-						if(vulnerability.appliesTo(adep.getVersion()))
-						{
-							myVulnerabilities.add(vulnerability);
-						}
-						@SuppressWarnings("unused")
-						URI uri = vulnerability.getUri();
-						@SuppressWarnings("unused")
-						String description = vulnerability.getDescription();
-					}
+		String pkgId = pkg.getGroup() + ":" + pkg.getName() + ":" + pkg.getVersion();
 
-					if(myVulnerabilities.isEmpty())
-					{
-						getLog().info(pkgId + "  " + vulnerabilities.length + " known vulnerabilities, 0 affecting installed version");
-					}
-					else
-					{
-						getLog().error("");
-						getLog().error("--------------------------------------------------------------");
-						getLog().error(pkgId + "  [VULNERABLE]");
-						PackageDependency parent = adep.getParent();
-						if(parent != null)
-						{
-							getLog().error("  required by " + parent.getId());
-						}
-						getLog().error(vulnerabilities.length + " known vulnerabilities, " + myVulnerabilities.size() + " affecting installed version");
-						getLog().error("");
-						for (VulnerabilityResource vulnerability : myVulnerabilities)
-						{
-							getLog().error(vulnerability.getUri().toString());
-							getLog().error(vulnerability.getDescription());
-							getLog().error("");
-						}
-						getLog().error("--------------------------------------------------------------");
-						getLog().error("");
-						failures += myVulnerabilities.size();
-					}
-
-				}
-				else
-				{
-					getLog().info(pkgId + "  No known vulnerabilities");
-				}
-			}
-			else
+		List<VulnerabilityDescriptor> vulnerabilities = pkg.getVulnerabilities();
+		if (vulnerabilities != null && !vulnerabilities.isEmpty()) {
+			int total = pkg.getVulnerabilityTotal();
+			int matches = pkg.getVulnerabilityMatches();
+			getLog().error("");
+			getLog().error("--------------------------------------------------------------");
+			getLog().error(pkgId + "  [VULNERABLE]");
+			if(parent != null)
 			{
-				getLog().info(pkgId + "  No known vulnerabilities");
+				String parentId = pkg.getGroup() + ":" + pkg.getName()  + ":" + pkg.getVersion();
+				getLog().error("  required by " + parentId);
 			}
-		}
-		else
-		{
-			getLog().info(pkgId + "  Unknown source for package");
+			getLog().error(total + " known vulnerabilities, " + matches + " affecting installed version");
+			getLog().error("");
+			for (VulnerabilityDescriptor vulnerability : vulnerabilities) {
+				getLog().error(vulnerability.getTitle());
+				getLog().error(vulnerability.getUriString());
+				getLog().error(vulnerability.getDescription());
+				getLog().error("");
+			}
+			getLog().error("--------------------------------------------------------------");
+			getLog().error("");
+			failures += matches;
+		} else {
+			getLog().info(pkgId + "  No known vulnerabilities");
 		}
 
 		return failures;
