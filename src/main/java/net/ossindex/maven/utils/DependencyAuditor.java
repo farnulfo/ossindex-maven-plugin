@@ -132,6 +132,7 @@ public class DependencyAuditor
 				// Only include each package once. They might be transitive dependencies from multiple places.
 				if (!parents.containsKey(pkgDep)) {
 					pkgDep = request.add("maven", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+//					MavenPackageDescriptor pkg = new MavenPackageDescriptor(pkgDep);
 					parents.put(pkgDep, parent);
 					packageDependency.add(pkgDep);
 				}
@@ -146,23 +147,26 @@ public class DependencyAuditor
 	}
 	
 	/**
-	 * Run the audit
+	 * Run the audit and wrap the results in MavenPackageDescriptor objects
 	 * @return The results collection
 	 * @throws IOException On error
 	 */
-	public Collection<PackageDescriptor> run() throws IOException {
-		return request.run();
+	public Collection<MavenPackageDescriptor> run() throws IOException {
+		List<MavenPackageDescriptor> results = new LinkedList<MavenPackageDescriptor>();
+		Collection<PackageDescriptor> packages = request.run();
+		for (PackageDescriptor pkg : packages) {
+			MavenPackageDescriptor mvnPkg = new MavenPackageDescriptor(pkg);
+			if (parents.containsKey(pkg)) {
+				PackageDescriptor parent = parents.get(pkg);
+				if (parent != null) {
+					mvnPkg.setParent(new MavenIdWrapper(parent));
+				}
+			}
+			results.add(mvnPkg);
+		}
+		return results;
 	}
 
-	/** Get the parent for the specified package
-	 * 
-	 * @param pkg
-	 * @return
-	 */
-	public PackageDescriptor getParent(PackageDescriptor pkg) {
-		return parents.get(pkg);
-	}
-	
 	/**
 	 * Close the cache, required for clean running
 	 */

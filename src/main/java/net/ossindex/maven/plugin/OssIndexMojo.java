@@ -26,12 +26,21 @@
  */
 package net.ossindex.maven.plugin;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
+
+import org.apache.commons.io.FileUtils;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -47,9 +56,15 @@ import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 import net.ossindex.common.PackageDescriptor;
 import net.ossindex.common.VulnerabilityDescriptor;
 import net.ossindex.maven.utils.DependencyAuditor;
+import net.ossindex.maven.utils.MavenIdWrapper;
+import net.ossindex.maven.utils.MavenPackageDescriptor;
+import net.ossindex.maven.utils.OssIndexResultsWrapper;
 
 /** Cross reference the project against information in OSS Index to identify
  * security and maintenance problems.
@@ -115,6 +130,15 @@ public class OssIndexMojo extends AbstractMojo
 	@Parameter(property = "audit.failOnError", defaultValue = "true")
 	private String failOnError;
 
+	/**
+	 * Comma separated list of output file paths
+	 * 
+	 * @parameter
+	 */
+	@Parameter(property = "audit.output", defaultValue = "")
+	private String output;
+	private Set<File> outputFiles = new HashSet<File>();
+
 	static
 	{
 		// Default log4j configuration. Hides configuration warnings.
@@ -143,6 +167,18 @@ public class OssIndexMojo extends AbstractMojo
 				}
 			}
 		}
+
+		if (output != null) {
+			output = output.trim();
+			if (!output.isEmpty()) {
+				String[] tokens = output.split(",");
+				for (String token : tokens)
+				{
+					outputFiles.add(new File(token));
+				}
+			}
+		}
+
 		DependencyAuditor auditor = new DependencyAuditor(repoSystem, repoSession);
 
 		try
@@ -160,25 +196,39 @@ public class OssIndexMojo extends AbstractMojo
 			}
 
 			// Perform the audit
-			Collection<PackageDescriptor> results = auditor.run();
+			Collection<MavenPackageDescriptor> results = auditor.run();
 
 			// Analyze the results
-			for (PackageDescriptor pkg : results) {
-				String id = pkg.getGroup() + ":" + pkg.getName();
-				String idVer = id + ":" + pkg.getVersion();
-				if(!ignoreSet.contains(id) && !ignoreSet.contains(idVer))
+			for (MavenPackageDescriptor pkg : results) {
+				String idPkg = pkg.getMavenPackageId();
+				String idVer = pkg.getMavenVersionId();
+				if(!ignoreSet.contains(idPkg) && !ignoreSet.contains(idVer))
 				{
-					PackageDescriptor parent = auditor.getParent(pkg);
-					failures += report(parent, pkg);
+					MavenIdWrapper parentPkg = pkg.getParent();
+					
+					failures += report(parentPkg, pkg);
 				}
 			}
 
-			if(failures > 0)
-			{
-				if("true".equals(failOnError))
-				{
+			// Report to various file loggers
+			for (File file: outputFiles) {
+				if (file.getName().endsWith(".txt")) {
+					exportTxt(file, results);
+				}
+				if (file.getName().endsWith(".json")) {
+					exportJson(file, results);
+				}
+				if (file.getName().endsWith(".xml")) {
+					exportXml(file, results);
+				}
+			}
+
+			if(failures > 0) {
+				if("true".equals(failOnError)) {
 					throw new MojoFailureException(failures + " known vulnerabilities affecting project dependencies");
 				}
+			} else {
+
 			}
 		}
 		catch (IOException e) {
@@ -190,16 +240,70 @@ public class OssIndexMojo extends AbstractMojo
 		}
 	}
 
+	/**
+	 * Export the results to a text file
+	 * @param file File to export to
+	 * @param results Data to export
+	 */
+	private void exportTxt(File file, Collection<MavenPackageDescriptor> results) {
+	}
+
+	/**
+	 * Export the results to a JSON file
+	 * @param file File to export to
+	 * @param results Data to export
+	 */
+	private void exportJson(File file, Collection<MavenPackageDescriptor> results) {
+		Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+		String json = gson.toJson(results);
+		try {
+			FileUtils.writeStringToFile(file, json);
+		} catch (IOException e) {
+			getLog().warn("Cannot export to " + file + ": " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Export the results to an XML file
+	 * @param file File to export to
+	 * @param results Data to export
+	 */
+	private void exportXml(File file, Collection<MavenPackageDescriptor> results) {
+		OssIndexResultsWrapper wrapper = new OssIndexResultsWrapper(results);
+		OutputStream out = null;
+		try {
+			out = new FileOutputStream(file);
+			JAXBContext context = JAXBContext.newInstance(OssIndexResultsWrapper.class);
+			Marshaller m = context.createMarshaller();
+			m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+			m.marshal(wrapper, out);
+
+		} catch (FileNotFoundException e) {
+			getLog().warn("Cannot export to " + file + ": " + e.getMessage());
+		} catch (JAXBException e) {
+			e.printStackTrace();
+			getLog().warn("Cannot export to " + file + ": " + e.getMessage());
+		} finally {
+			if (out != null) {
+				try {
+					out.close();
+				} catch (IOException e) {
+					getLog().warn("Exception closing " + file + ": " + e.getMessage());
+				}
+			}
+		}
+	}
+
 	/** Reports on all identified packages and known vulnerabilities.
 	 * 
 	 * @param adep List of package dependency information (with applicable audit information)
 	 * @return Number of applicable vulnerabilities (indicating failure)
 	 * @throws IOException On error
 	 */
-	private int report(PackageDescriptor parent, PackageDescriptor pkg) throws IOException
+	private int report(MavenIdWrapper parentPkg, MavenPackageDescriptor pkg) throws IOException
 	{
 		int failures = 0;
-		String pkgId = pkg.getGroup() + ":" + pkg.getName() + ":" + pkg.getVersion();
+		String pkgId = pkg.getMavenVersionId();
 		int total = pkg.getVulnerabilityTotal();
 
 		List<VulnerabilityDescriptor> vulnerabilities = pkg.getVulnerabilities();
@@ -208,9 +312,9 @@ public class OssIndexMojo extends AbstractMojo
 			getLog().error("");
 			getLog().error("--------------------------------------------------------------");
 			getLog().error(pkgId + "  [VULNERABLE]");
-			if(parent != null)
+			if(parentPkg != null)
 			{
-				String parentId = parent.getGroup() + ":" + parent.getName()  + ":" + parent.getVersion();
+				String parentId = parentPkg.getMavenVersionId();
 				getLog().error("  required by " + parentId);
 			}
 			getLog().error(total + " known vulnerabilities, " + matches + " affecting installed version");
