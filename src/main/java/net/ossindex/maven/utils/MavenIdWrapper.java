@@ -103,6 +103,7 @@ public class MavenIdWrapper {
 		if (groupId != null) {
 			sb.append(groupId);
 		}
+		sb.append(":");
 		if (artifactId != null) {
 			sb.append(artifactId);
 		}
@@ -118,9 +119,11 @@ public class MavenIdWrapper {
 		if (groupId != null) {
 			sb.append(groupId);
 		}
+		sb.append(":");
 		if (artifactId != null) {
 			sb.append(artifactId);
 		}
+		sb.append(":");
 		if (version != null) {
 			sb.append(version);
 		}

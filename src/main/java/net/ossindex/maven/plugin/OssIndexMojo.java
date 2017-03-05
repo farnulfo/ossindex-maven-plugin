@@ -375,9 +375,9 @@ public class OssIndexMojo extends AbstractMojo
 			failures += matches;
 		} else {
 			if (total > 0) {
-				getLog().info(pkgId + ": " + total + " known vulnerabilities, 0 affecting installed version");
+				getLog().info(pkgId + " - " + total + " known vulnerabilities, 0 affecting installed version");
 			} else {
-				getLog().info(pkgId + ": No known vulnerabilities");
+				getLog().info(pkgId + " - No known vulnerabilities");
 			}
 		}
 
