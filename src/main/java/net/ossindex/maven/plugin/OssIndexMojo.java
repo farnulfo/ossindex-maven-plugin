@@ -29,8 +29,10 @@ package net.ossindex.maven.plugin;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -59,7 +61,6 @@ import org.eclipse.aether.repository.RemoteRepository;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import net.ossindex.common.PackageDescriptor;
 import net.ossindex.common.VulnerabilityDescriptor;
 import net.ossindex.maven.utils.DependencyAuditor;
 import net.ossindex.maven.utils.MavenIdWrapper;
@@ -246,6 +247,50 @@ public class OssIndexMojo extends AbstractMojo
 	 * @param results Data to export
 	 */
 	private void exportTxt(File file, Collection<MavenPackageDescriptor> results) {
+		PrintWriter out = null;
+		try {
+			out = new PrintWriter(new FileWriter(file));
+			for (MavenPackageDescriptor pkg : results) {
+				MavenIdWrapper parentPkg = pkg.getParent();
+				String pkgId = pkg.getMavenVersionId();
+				int total = pkg.getVulnerabilityTotal();
+
+				List<VulnerabilityDescriptor> vulnerabilities = pkg.getVulnerabilities();
+				if (vulnerabilities != null && !vulnerabilities.isEmpty()) {
+					int matches = pkg.getVulnerabilityMatches();
+					out.println("");
+					out.println("--------------------------------------------------------------");
+					out.println(pkgId + "  [VULNERABLE]");
+					if(parentPkg != null)
+					{
+						String parentId = parentPkg.getMavenVersionId();
+						out.println("  required by " + parentId);
+					}
+					out.println(total + " known vulnerabilities, " + matches + " affecting installed version");
+					out.println("");
+					for (VulnerabilityDescriptor vulnerability : vulnerabilities) {
+						out.println(vulnerability.getTitle());
+						out.println(vulnerability.getUriString());
+						out.println(vulnerability.getDescription());
+						out.println("");
+					}
+					out.println("--------------------------------------------------------------");
+					out.println("");
+				} else {
+					if (total > 0) {
+						out.println(pkgId + ": " + total + " known vulnerabilities, 0 affecting installed version");
+					} else {
+						out.println(pkgId + ": No known vulnerabilities");
+					}
+				}
+			}
+		} catch (IOException e) {
+			getLog().warn("Cannot export to " + file + ": " + e.getMessage());
+		} finally {
+			if (out != null) {
+				out.close();
+			}
+		}
 	}
 
 	/**
