@@ -8,16 +8,8 @@ This is a rewrite from previous versions to use the much simplified v2.0 API.
 Requirements
 -------------
 
-* Maven 3.1
+* Maven 3.1 or higher
 * An internet connection with access to https://ossindex.net 
-
-[How To Install Apache Maven 3.2.1 On Ubuntu 14.04, Linux Mint 17 And Their Derivative Systems](http://linuxg.net/how-to-install-apache-maven-3-2-1-on-ubuntu-14-04-linux-mint-17-and-their-derivative-systems/)
-
-Depending on your platform and installation details, you may also want to symbolically link maven3 like so:
-```
-sudo ln -s /usr/bin/mvn3 /usr/bin/mvn
-sudo ln -s /usr/share/maven3 /usr/share/maven
-```
 
 Usage
 -----
