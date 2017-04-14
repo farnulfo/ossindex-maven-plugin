@@ -180,6 +180,23 @@ Disable fail on error
 
 In the current version the build will fail on an error. This default will be changing in the next release. In the meanwhile, you can disable this behaviour by specifying `-Daudit.failOnError=false` on the maven command line
 
+Ignore vulnerability for package(s)
+-----------------------------------
+
+In some cases a particular vulnerability might not affect your software, or you may want to ignore the vulnerability for some reason or another. This can currently be accomplished by adding the `-Daudit.ignore=<artifacts>` option, where `<artifacts>` is a comma delimited list of group:artifact IDs.
+
+```
+mvn compile net.ossindex:ossindex-maven-plugin:audit \
+  -Daudit.ignore=org.apache.struts:struts2-core,commons-fileupload:commons-fileupload
+```
+
+You can also specify particular package versions to ignore
+
+```
+mvn compile net.ossindex:ossindex-maven-plugin:audit \
+   -Daudit.ignore=org.apache.struts:struts2-core:2.3.20,commons-fileupload:commons-fileupload:1.3.1
+```
+
 Integration into Jenkins
 ------------------------
 
