@@ -8,16 +8,8 @@ This is a rewrite from previous versions to use the much simplified v2.0 API.
 Requirements
 -------------
 
-* Maven 3.1
+* Maven 3.1 or higher
 * An internet connection with access to https://ossindex.net 
-
-[How To Install Apache Maven 3.2.1 On Ubuntu 14.04, Linux Mint 17 And Their Derivative Systems](http://linuxg.net/how-to-install-apache-maven-3-2-1-on-ubuntu-14-04-linux-mint-17-and-their-derivative-systems/)
-
-Depending on your platform and installation details, you may also want to symbolically link maven3 like so:
-```
-sudo ln -s /usr/bin/mvn3 /usr/bin/mvn
-sudo ln -s /usr/share/maven3 /usr/share/maven
-```
 
 Usage
 -----
@@ -99,21 +91,103 @@ Build step 'Invoke top-level Maven targets' marked build as failure
 Finished: FAILURE
 ```
 
-### Unknown source output
+Report output
+-------------
 
-The "Unknown source for package" message can mean one of a few things.
+Use the `-Daudit.output=<path>` argument on the maven command line export the results in a variety of formats, depending on the file extension. You can output in multiple formats by providing a comma separated list of file paths (either relative or absolute paths will do). For example:
+
+mvn install net.ossindex:ossindex-maven-plugin:audit -Daudit.failOnError=false -Daudit.output=test.json,test.xml,test.txt
+You will get three different files output, each with a different format.
+
+The structure of the JSON and XML formats follow the internal representation of the data in the maven plugin itself (I simply serialize the objects to disk). You will see every requested package, including their transitive dependencies, regardless whether there are vulnerabilities or not. If a package has known vulnerabilities then it will have the "vulnerability-total" field assigned a value greater then 0. If there are vulnerabilities that affect the requested version of the package, then the "vulnerability-matches" matches field assigned accordingly, and the "vulnerabilities" list will be filled with the details. Here is a sample with one non-vulnerable package and one vulnerable package in JSON:
 
 ```
-...
-[INFO] net.ossindex:heuristic-version:0.0.6  Unknown source for package
-[INFO] org.codehaus.woodstox:wstx-asl:3.2.6  Unknown source for package
-...
+[
+  {
+    "vulnerability-total": 0,
+    "vulnerability-matches": 0,
+    "groupId": "org.apache.commons",
+    "artifactId": "commons-dbcp2",
+    "version": "2.1.1"
+  },
+  {
+    "parent": {
+      "groupId": "org.apache.commons",
+      "artifactId": "commons-dbcp2",
+      "version": "2.1.1"
+    },
+    "vulnerability-total": 39,
+    "vulnerability-matches": 1,
+    "vulnerabilities": [
+      {
+        "id": 348558,
+        "title": "[CVE-2011-5034]  Improper Input Validation",
+        "description": "Apache Geronimo 2.2.1 and earlier computes hash values for form parameters without restricting the ability to trigger hash collisions predictably, which allows remote attackers to cause a denial of service (CPU consumption) by sending many crafted parameters.  NOTE: this might overlap CVE-2011-4461.",
+        "versions": [
+          "1.0",
+          "1.1",
+          "1.1.1",
+          "1.2",
+          "2.0.1",
+          "2.0.2",
+          "2.1",
+          "2.1.1",
+          "2.1.2",
+          "2.1.3",
+          "2.1.4",
+          "2.1.5",
+          "2.1.6",
+          "2.1.7",
+          "2.1.8",
+          "2.2",
+          "2.2.1"
+        ],
+        "references": [
+          "http://archives.neohapsis.com/archives/bugtraq/2011-12/0181.html",
+          "http://cve.mitre.org/cgi-bin/cvename.cgi?name=2011-5034",
+          "http://secunia.com/advisories/47412",
+          "http://www.cvedetails.com/cve-details.php?t=1&cve_id=CVE-2011-5034",
+          "http://www.kb.cert.org/vuls/id/903934",
+          "http://www.nruns.com/_downloads/advisory28122011.pdf",
+          "http://www.ocert.org/advisories/ocert-2011-003.html",
+          "https://github.com/FireFart/HashCollision-DOS-POC/blob/master/HashtablePOC.py",
+          "https://web.nvd.nist.gov/view/vuln/detail?vulnId=2011-5034"
+        ],
+        "published": 1325210101610,
+        "updated": 1352178300500,
+        "cve": "CVE-2011-5034"
+      }
+    ],
+    "groupId": "org.apache.geronimo.specs",
+    "artifactId": "geronimo-jta_1.1_spec",
+    "version": "1.1.1"
+  },
+]
 ```
 
-1. The package belongs to you and is not open source or available to OSS Index
-2. The package is known to OSS Index, but requires initialization (see "Package Initialization", below)
-3. The package is not known to OSS Index
+You'll note that the vulnerable package's "parent" is commons-dbcp2, this is not necessarily the direct parent but does indicate that geronimo-jta_1.1_spec is a downstream dependency of commons-dbcp2.
 
+Disable fail on error
+------------------------
+
+In the current version the build will fail on an error. This default will be changing in the next release. In the meanwhile, you can disable this behaviour by specifying `-Daudit.failOnError=false` on the maven command line
+
+Ignore vulnerability for package(s)
+-----------------------------------
+
+In some cases a particular vulnerability might not affect your software, or you may want to ignore the vulnerability for some reason or another. This can currently be accomplished by adding the `-Daudit.ignore=<artifacts>` option, where `<artifacts>` is a comma delimited list of group:artifact IDs.
+
+```
+mvn compile net.ossindex:ossindex-maven-plugin:audit \
+  -Daudit.ignore=org.apache.struts:struts2-core,commons-fileupload:commons-fileupload
+```
+
+You can also specify particular package versions to ignore
+
+```
+mvn compile net.ossindex:ossindex-maven-plugin:audit \
+   -Daudit.ignore=org.apache.struts:struts2-core:2.3.20,commons-fileupload:commons-fileupload:1.3.1
+```
 
 Integration into Jenkins
 ------------------------
@@ -135,20 +209,3 @@ If a vulnerability is detected in a dependency the build will indicate a failure
 log output for the build will contain something like this:
 
 ![Jenkins error](docs/jenkins-err.png)
-
-Package Initialization
-----------------------
-
-OSS Index has vast stores of information about packages, vulnerabilities, and source repositories. Notification by ossindex-maven-plugin about these vulnerabilities require that this information be cross referenced with each other, which requires manual intervention.
-
-If a requested package is open source, then it is queued on OSS Index servers and marked as requested. Our auditors will provide the required cross references as they are requested, though it may take a few days depending on load. Once the references are created they are persistent and do not require rebuilding.
-
-You should see the "Unknown source for package" messages disappearing. If such a message
-persists over a long time then either the package remains unknown or we cannot find related
-sources.
-
-Currently the likelyhood of seeing the "Unknown source for package" message is rather high,
-but will reduce over time (hopefully quickly).
-
-OSS Index will be providing an interface that will allow users to help improve results by
-adding unknown sources, packages, and vulnerabilities. Stay tuned!
