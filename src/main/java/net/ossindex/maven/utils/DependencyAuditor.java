@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
@@ -62,7 +63,7 @@ public class DependencyAuditor
 {
 	private Map<PackageDescriptor,PackageDescriptor> parents = new HashMap<PackageDescriptor,PackageDescriptor>();
 	private IPackageRequest request = OssIndexApi.createPackageRequest();
-	
+
 	private RepositorySystem repoSystem;
 	private RepositorySystemSession session;
 
@@ -86,12 +87,13 @@ public class DependencyAuditor
 
 	/**
 	 * Add an artifact and its dependencies to the request
+	 * @param exclusionSet 
 	 */
-	public void add(String groupId, String artifactId, String version)
+	public void add(String groupId, String artifactId, String version, Set<String> exclusionSet)
 	{
 		PackageDescriptor parent = request.add("maven", groupId, artifactId, version);
 		parents.put(parent, null);
-		addPackageDependencies(parent, groupId, artifactId, version);
+		addPackageDependencies(parent, groupId, artifactId, version, exclusionSet);
 	}
 
 
@@ -101,9 +103,10 @@ public class DependencyAuditor
 	 * @param groupId Artifact group ID
 	 * @param artifactId Artifact OD
 	 * @param version Version number
+	 * @param exclusionSet 
 	 * @return List of package dependencies
 	 */
-	private List<PackageDescriptor> addPackageDependencies(PackageDescriptor parent, String groupId, String artifactId, String version)
+	private List<PackageDescriptor> addPackageDependencies(PackageDescriptor parent, String groupId, String artifactId, String version, Set<String> exclusionSet)
 	{
 		List<PackageDescriptor> packageDependency = new LinkedList<PackageDescriptor>();
 		String aid = groupId + ":" + artifactId + ":";
@@ -128,13 +131,16 @@ public class DependencyAuditor
 			List<Artifact> artifacts = nlg.getArtifacts(false);
 			for (Artifact artifact : artifacts)
 			{
-				PackageDescriptor pkgDep = new PackageDescriptor("maven", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
-				// Only include each package once. They might be transitive dependencies from multiple places.
-				if (!parents.containsKey(pkgDep)) {
-					pkgDep = request.add("maven", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
-//					MavenPackageDescriptor pkg = new MavenPackageDescriptor(pkgDep);
-					parents.put(pkgDep, parent);
-					packageDependency.add(pkgDep);
+				String id = artifact.getGroupId() + ":" + artifact.getArtifactId();
+				if (!exclusionSet.contains(id)) {
+					PackageDescriptor pkgDep = new PackageDescriptor("maven", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+					// Only include each package once. They might be transitive dependencies from multiple places.
+					if (!parents.containsKey(pkgDep)) {
+						pkgDep = request.add("maven", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+						//					MavenPackageDescriptor pkg = new MavenPackageDescriptor(pkgDep);
+						parents.put(pkgDep, parent);
+						packageDependency.add(pkgDep);
+					}
 				}
 			}
 		}
@@ -145,7 +151,7 @@ public class DependencyAuditor
 		}
 		return packageDependency;
 	}
-	
+
 	/**
 	 * Run the audit and wrap the results in MavenPackageDescriptor objects
 	 * @return The results collection

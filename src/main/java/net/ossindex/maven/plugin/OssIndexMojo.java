@@ -47,6 +47,7 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Exclusion;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -193,7 +194,14 @@ public class OssIndexMojo extends AbstractMojo
 			// Assemble the query
 			for (Dependency dep : deps)
 			{
-				auditor.add(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
+				@SuppressWarnings("unchecked")
+				List<Exclusion> exclusions = dep.getExclusions();
+				Set<String> exclusionSet = new HashSet<String>();
+				for (Exclusion exclusion : exclusions) {
+					exclusionSet.add(exclusion.getGroupId() + ":" + exclusion.getArtifactId());
+				}
+				
+				auditor.add(dep.getGroupId(), dep.getArtifactId(), dep.getVersion(), exclusionSet);
 			}
 
 			// Perform the audit
