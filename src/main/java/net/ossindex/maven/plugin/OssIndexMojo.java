@@ -46,18 +46,21 @@ import org.apache.commons.io.FileUtils;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.apache.maven.model.Dependency;
-import org.apache.maven.model.Exclusion;
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
-import org.eclipse.aether.RepositorySystem;
-import org.eclipse.aether.RepositorySystemSession;
-import org.eclipse.aether.repository.RemoteRepository;
+import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.shared.dependency.graph.DependencyGraphBuilder;
+import org.apache.maven.shared.dependency.graph.DependencyGraphBuilderException;
+import org.apache.maven.shared.dependency.graph.DependencyNode;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -77,37 +80,6 @@ import net.ossindex.maven.utils.OssIndexResultsWrapper;
 @Mojo( name = "audit")
 public class OssIndexMojo extends AbstractMojo
 {
-	/**
-	 * The entry point to Aether, i.e. the component doing all the work.
-	 * 
-	 * @component
-	 */
-	@Component
-	private RepositorySystem repoSystem;
-
-	/**
-	 * The current repository/network configuration of Maven.
-	 * 
-	 * @parameter default-value="${repositorySystemSession}"
-	 */
-	@Parameter(defaultValue="${repositorySystemSession}", readonly = true)
-	private RepositorySystemSession repoSession;
-
-	/**
-	 * The project's remote repositories to use for the resolution of project dependencies.
-	 * 
-	 * @parameter default-value="${project.remoteProjectRepositories}"
-	 */
-	@Parameter(defaultValue="${project.remoteProjectRepositories}", readonly = true)
-	private List<RemoteRepository> projectRepos;
-
-	/**
-	 * The project's remote repositories to use for the resolution of plugins and their dependencies.
-	 * 
-	 * @parameter default-value="${project.remotePluginRepositories}"
-	 */
-	@Parameter(defaultValue="${project.remotePluginRepositories}", readonly = true)
-	private List<RemoteRepository> pluginRepos;
 
 	/**
 	 * @parameter default-value="${project}"
@@ -140,6 +112,15 @@ public class OssIndexMojo extends AbstractMojo
 	@Parameter(property = "audit.output", defaultValue = "")
 	private String output;
 	private Set<File> outputFiles = new HashSet<File>();
+
+	@Parameter( defaultValue = "${session}", readonly = true, required = true )
+	private MavenSession session;
+
+	/**
+	 * The dependency tree builder to use.
+	 */
+	@Component( hint = "default" )
+	private DependencyGraphBuilder dependencyGraphBuilder;
 
 	static
 	{
@@ -181,27 +162,27 @@ public class OssIndexMojo extends AbstractMojo
 			}
 		}
 
-		DependencyAuditor auditor = new DependencyAuditor(repoSystem, repoSession);
+		DependencyAuditor auditor = new DependencyAuditor();
 
 		try
 		{
 			getLog().info("OSS Index dependency audit");
 
 			int failures = 0;
-			@SuppressWarnings("unchecked")
 
-			List<Dependency> deps = project.getDependencies();
-			// Assemble the query
-			for (Dependency dep : deps)
-			{
-				@SuppressWarnings("unchecked")
-				List<Exclusion> exclusions = dep.getExclusions();
-				Set<String> exclusionSet = new HashSet<String>();
-				for (Exclusion exclusion : exclusions) {
-					exclusionSet.add(exclusion.getGroupId() + ":" + exclusion.getArtifactId());
-				}
-				
-				auditor.add(dep.getGroupId(), dep.getArtifactId(), dep.getVersion(), exclusionSet);
+			ArtifactFilter artifactFilter = null;
+			ProjectBuildingRequest buildingRequest =
+					new DefaultProjectBuildingRequest( session.getProjectBuildingRequest() );
+
+			buildingRequest.setProject( project );
+
+			// The computed dependency tree root node of the Maven project.
+			DependencyNode rootNode = dependencyGraphBuilder.buildDependencyGraph( buildingRequest, artifactFilter );
+			List<DependencyNode> depNodes = rootNode.getChildren();
+			
+			for (DependencyNode dep : depNodes) {
+				Artifact artifact = dep.getArtifact();
+				auditor.add(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion(), dep);
 			}
 
 			// Perform the audit
@@ -214,7 +195,7 @@ public class OssIndexMojo extends AbstractMojo
 				if(!ignoreSet.contains(idPkg) && !ignoreSet.contains(idVer))
 				{
 					MavenIdWrapper parentPkg = pkg.getParent();
-					
+
 					failures += report(parentPkg, pkg);
 				}
 			}
@@ -240,7 +221,7 @@ public class OssIndexMojo extends AbstractMojo
 
 			}
 		}
-		catch (IOException e) {
+		catch (IOException | DependencyGraphBuilderException e) {
 			e.printStackTrace();
 		}
 		finally
